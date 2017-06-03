@@ -1,0 +1,21 @@
+hash: 64b2a6ced202a6ea30bdc6ca875b300515894ff0e8a6d6317c481952d1af1df6
+updated: 2017-06-03T17:34:47.312958814-04:00
+imports:
+- name: github.com/prometheus/client_golang
+  version: c5b7fccd204277076155f10851dad72b76a49317
+- name: go.uber.org/atomic
+  version: 4e336646b2ef9fc6e47be8e21594178f98e5ebcf
+- name: go.uber.org/zap
+  version: fab453050a7a08c35f31fc5fff6f2dbd962285ab
+  subpackages:
+  - buffer
+  - internal/bufferpool
+  - internal/color
+  - internal/exit
+  - internal/multierror
+  - zapcore
+- name: google.golang.org/api
+  version: 8e09a3d939255ba9bfb76049b7cc413740986c03
+  subpackages:
+  - storage/v1
+testImports: []

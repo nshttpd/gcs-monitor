@@ -1,0 +1,11 @@
+package: github.com/nshttpd/gcs-monitor
+import:
+- package: google.golang.org/api
+  subpackages:
+  - storage/v1
+- package: go.uber.org/zap
+  version: v1.4.0
+- package: go.uber.org/atomic
+  version: v1.2.0
+- package: github.com/prometheus/client_golang
+  version: v0.8.0
