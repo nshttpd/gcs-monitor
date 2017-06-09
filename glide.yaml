@@ -9,3 +9,6 @@ import:
   version: v1.2.0
 - package: github.com/prometheus/client_golang
   version: v0.8.0
+- package: golang.org/x/sync
+  subpackages:
+  - semaphore
