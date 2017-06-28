@@ -12,9 +12,14 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	defaultNumWorkers = 5
+)
+
 func main() {
 	project := flag.String("project", "", "project pubsub queues will be in")
 	topics := flag.String("topics", "", "list of topics (comma separated) to listen to")
+	workers := flag.Int("workers", defaultNumWorkers, "number of workers per pub/sub queue")
 	//	port := flag.Int("port", 9142, "port to listen on for /metrics scraping")
 	flag.Parse()
 
@@ -54,7 +59,7 @@ func main() {
 	defer client.Close()
 
 	for _, t := range tlist {
-		h := gcs_monitor.NewHandler(logger, metrics, 5)
+		h := gcs_monitor.NewHandler(logger, metrics, *workers, ctx)
 		err = h.Init(client, *project, t); if err != nil {
 			logger.Error("error initializing handler",
 				zap.String("project", *project),

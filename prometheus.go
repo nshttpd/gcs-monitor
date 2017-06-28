@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	promNamespace = "gcsmonitor"
+	promNamespace = "gcs_monitor"
 )
 
 var (
