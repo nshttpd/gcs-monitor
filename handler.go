@@ -1,13 +1,15 @@
 package gcs_monitor
 
 import (
-	"go.uber.org/zap"
-	"cloud.google.com/go/pubsub"
-	context "golang.org/x/net/context"
+	"encoding/json"
 	"errors"
 	"time"
-	json "encoding/json"
+
+	"cloud.google.com/go/pubsub"
+	"go.uber.org/zap"
+	"golang.org/x/net/context"
 	storage "google.golang.org/api/storage/v1"
+	"fmt"
 )
 
 type BucketHandler struct {
@@ -45,7 +47,8 @@ func (h *BucketHandler) Init(client *pubsub.Client, project string, topic string
 
 	t := client.Topic(topic)
 
-	ok, err := t.Exists(ctx); if err != nil {
+	ok, err := t.Exists(ctx)
+	if err != nil {
 		return err
 	}
 
@@ -55,27 +58,42 @@ func (h *BucketHandler) Init(client *pubsub.Client, project string, topic string
 
 	h.sub = client.Subscription(subName)
 
-	ok, err = h.sub.Exists(ctx); if err != nil {
+	ok, err = h.sub.Exists(ctx)
+	if err != nil {
 		return err
 	}
 
 	if !ok {
 		cfg := pubsub.SubscriptionConfig{
-			Topic: t,
+			Topic:       t,
 			AckDeadline: 20 * time.Second,
 		}
 
-		h.sub, err = client.CreateSubscription(ctx, subName, cfg); if err != nil {
+		h.sub, err = client.CreateSubscription(ctx, subName, cfg)
+		h.sub.ReceiveSettings.MaxExtension = 1 * time.Minute
+		h.sub.ReceiveSettings.NumGoroutines = h.workers
+		if err != nil {
 			return err
 		}
+
+		h.logger.Debug("created subscription",
+			zap.String("topic", h.topic),
+			zap.String("subscription", h.sub.String()),
+		)
 	}
 
 	return nil
 }
 
-func (h *BucketHandler) handle(cancel context.CancelFunc, m *pubsub.Message, t chan int) {
-	defer cancel()
+func (h *BucketHandler) handle(cancel context.CancelFunc, m *pubsub.Message) {
+	defer func() {
+		cancel()
+		h.logger.Debug("canceling context for message",
+			zap.String("msgID", m.ID),
+		)
+	}()
 
+	// eventType and buckeId are always attributes on the message from GCS
 	h.metrics.IncFileCounter(m.Attributes["eventType"], m.Attributes["bucketId"])
 
 	if m.Attributes["payloadFormat"] == "JSON_API_V1" {
@@ -92,12 +110,11 @@ func (h *BucketHandler) handle(cancel context.CancelFunc, m *pubsub.Message, t c
 			} else {
 				h.metrics.IncZeroFileCounter(m.Attributes["eventType"], m.Attributes["bucketId"])
 			}
+			m.Ack()
 		}
 	}
 
-	if t != nil {
-		<-t
-	}
+	return
 }
 
 func (h *BucketHandler) Run() {
@@ -107,22 +124,22 @@ func (h *BucketHandler) Run() {
 		zap.String("topic", h.topic),
 	)
 
-	t := make(chan int, h.workers)
-
 	for {
-		t <- 1
+		h.logger.Debug("Receive start")
 		cctx, cancel := context.WithCancel(h.ctx)
 		err := h.sub.Receive(cctx, func(ctx context.Context, m *pubsub.Message) {
 			h.logger.Debug("starting message from topic",
 				zap.String("topic", h.topic),
 				zap.String("msgID", m.ID),
 			)
-			go h.handle(cancel, m, t)
+			h.handle(cancel, m)
 		})
-		if err != context.Canceled {
+		if err != nil && err != context.Canceled {
 			h.logger.Error("error processing message",
 				zap.Error(err),
 			)
+			fmt.Printf("%v\n", err)
 		}
+		h.logger.Debug("Receive done")
 	}
 }
